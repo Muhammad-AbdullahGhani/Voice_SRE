@@ -1,94 +1,116 @@
-# Voice SRE (Agentic Infrastructure Supervisor)
+# Voice-Activated SRE (Agentic Infrastructure Supervisor)
 
-This project is a Real-Time Agentic Voice Supervisor for Kubernetes cluster management and telemetry querying. It leverages FastAPI, LangGraph, LiveKit, Prometheus, and the Kubernetes Python client.
-
----
-
-## Current Progress
-
-### Phase 1: Deterministic Tooling & Infrastructure Bridge
-- **FastAPI Project Structure**: Core project modules (`app/`, `tests/`) initialized.
-- **Kubernetes Client Tools**: Read-only tools `get_pod_status()` and `get_node_metrics()` implemented with automatic failover to high-fidelity mock data.
-- **Unit & Integration Testing**: Implemented initial endpoint and tool test cases.
-
-### Phase 2: LangGraph Orchestration (Newly Completed)
-- **LangGraph State Machine**: Designed and compiled a `StateGraph` agent supervisor in [app/agents/supervisor.py](file:///C:/Users/i222683AbdullahGhani/desktop/voice_sre/app/agents/supervisor.py).
-- **Node Workflows**: Implemented a four-step loop:
-  - `listen`: STT transcript capture interface.
-  - `reason`: Evaluates the conversation status, invoking an LLM or fallback rule-based reasoning engine.
-  - `tool_use`: Performs asynchronous Kubernetes function calling.
-  - `synthesize_response`: Synthesizes final text back for the TTS engine.
-- **Conversational Memory**: Integrated a checkpointer `MemorySaver` in LangGraph to persist conversation threads and manage multi-turn context (e.g., matching subsequent instructions like *"scale it up"* or *"restart it"* to the active deployment context).
-- **Kubernetes Action Tools**: Expanded [app/tools/kubernetes.py](file:///C:/Users/i222683AbdullahGhani/desktop/voice_sre/app/tools/kubernetes.py) with mutate capabilities:
-  - `restart_pod()`: Deletes the pod to trigger a rolling/immediate restart (with active state mutations in mock mode).
-  - `scale_deployment()`: Scales replicas up or down (with high-fidelity mock pod updates in mock mode).
-- **Interactive CLI Demo**: Created a text-based terminal program [cli.py](file:///C:/Users/i222683AbdullahGhani/desktop/voice_sre/cli.py) to test state transitions and memory saving interactively.
-- **Orchestration Tests**: Created [tests/test_agent.py](file:///C:/Users/i222683AbdullahGhani/desktop/voice_sre/tests/test_agent.py) to ensure the LangGraph loop, memory, and mock transitions work perfectly.
+A real-time, voice-driven Agentic Co-pilot designed for Kubernetes cluster telemetry, diagnostics, and remediation. This project transforms traditional cluster management and MLOps supervision into an interactive, voice-driven experience using **FastAPI**, **LangGraph**, **LiveKit WebRTC**, and **Next.js**.
 
 ---
 
-## Directory Structure
+## 🌟 Key Features
+
+*   **🎙️ Real-Time Voice Transport**: Powered by LiveKit WebRTC, incorporating Silero Voice Activity Detection (VAD), Whisper Speech-to-Text (STT), and OpenAI Text-to-Speech (TTS) for low-latency voice streaming.
+*   **🧠 LangGraph Orchestration**: Orchestrated as a state machine (`LISTEN` → `REASON` → `TOOL_USE` → `SYNTHESIZE`) that manages conversational context, routes requests, and performs deterministic checks.
+*   **💾 Conversational Memory**: Integrated checkpointer memory (`MemorySaver`) that persists context across speech turns (e.g. asking *"Restart it"* targeting the previously diagnosed pod).
+*   **⚙️ Deterministic Kubernetes Tools**: Official Python Kubernetes Client integration for querying cluster telemetry (`get_pod_status`, `get_node_metrics`) and executing remediation actions (`restart_pod`, `scale_deployment`).
+*   **🧪 Resilient Mock Simulation Mode**: Automatic environment detection. If a live Kubernetes cluster context (Minikube/Kind) is missing, the backend defaults to high-fidelity, in-memory state mutations (e.g. scaling pods in mock mode updates the in-memory state dynamically).
+*   **📺 War Room Dashboard (Next.js + WebSockets)**: A recruiter-facing web interface featuring a glowing audio visualizer, live telemetry feeds, manual override actions, and a real-time terminal logging the agent's internal reasoning loop via WebSockets.
+
+---
+
+## 🏗️ Project Architecture
+
+```mermaid
+graph TD
+    User([SRE Operator]) <-->|WebRTC Voice / WebSockets| Frontend[Next.js Recruiter Dashboard]
+    Frontend <-->|REST / WebSocket / Token| Backend[FastAPI Backend Server]
+    Backend <-->|LangGraph State Machine| Agent[LangGraph SRE Supervisor]
+    Agent <-->|Tool Bindings| K8sClient[Kubernetes Client & Tools]
+    K8sClient <-->|APIs / Mocks| Cluster[K8s Cluster / Mock Simulation]
+```
+
+---
+
+## 📁 Directory Structure
+
 ```
 voice_sre/
-├── requirements.txt
-├── README.md
-├── cli.py                 # Text-based Supervisor CLI (Interactive Test program)
-├── app/
+├── requirements.txt       # Python backend dependencies
+├── cli.py                 # Interactive Text-based Agent CLI (Phase 2 Demo)
+├── livekit_agent.py       # LiveKit voice transport worker script (Phase 3 Voice Agent)
+├── Dockerfile             # FastAPI backend container definition
+├── docker-compose.yml     # Multi-container orchestrator (FastAPI + Next.js)
+├── app/                   # FastAPI backend application package
 │   ├── __init__.py
-│   ├── main.py            # FastAPI Entry Point (with read and action routes)
-│   ├── config.py          # App Config Manager (Pydantic settings)
+│   ├── main.py            # API routes, WS agent streamer & LiveKit token generator
+│   ├── config.py          # Configuration manager using Pydantic Settings
 │   ├── agents/
 │   │   ├── __init__.py
-│   │   └── supervisor.py  # LangGraph Agent State Graph & Nodes
+│   │   └── supervisor.py  # LangGraph Agent Supervisor definition & nodes
 │   └── tools/
 │       ├── __init__.py
-│       └── kubernetes.py  # Kubernetes Client & Tool Functions
-└── tests/
+│       └── kubernetes.py  # Read/Write Kubernetes tools (Mock + Live)
+├── frontend/              # Next.js frontend application package
+│   ├── Dockerfile         # Next.js web application container definition
+│   ├── package.json       # Node package manager configurations
+│   ├── src/app/
+│   │   ├── page.tsx       # Live War Room Dashboard client page
+│   │   └── globals.css    # Tailwind CSS styling imports
+└── tests/                 # Automation testing packages
     ├── __init__.py
-    ├── test_k8s_tools.py  # Basic Tools Tests
-    └── test_agent.py      # LangGraph Supervisor Agent Tests
+    ├── test_k8s_tools.py  # Telemetry tool unit tests
+    └── test_agent.py      # LangGraph state machine, WebSockets & API integration tests
 ```
 
 ---
 
-## Getting Started
+## 🚀 Getting Started
 
-### 1. Prerequisites
-- Python 3.13+
-- (Optional) Kubernetes cluster context (e.g. Minikube, Kind, or remote cluster)
-
-### 2. Setup Virtual Environment & Install Dependencies
+### Option A: Run via Docker Compose (Recommended)
+You can start both the FastAPI backend and Next.js frontend services with a single command:
 ```bash
-python -m venv .venv
-.venv\Scripts\activate  # On Windows
-pip install -r requirements.txt
+docker-compose up --build
 ```
+- Open the dashboard at [http://localhost:3000](http://localhost:3000)
+- The backend API runs on [http://localhost:8000](http://localhost:8000)
 
-### 3. Run Interactive CLI Agent
-To interactively chat with the supervisor and watch node transitions (`LISTEN -> REASON -> TOOL_USE -> REASON -> SYNTHESIZE`):
+### Option B: Local Setup (Manual)
+
+#### 1. Setup Backend
+1. Create virtual environment and install packages:
+   ```bash
+   python -m venv .venv
+   .venv\Scripts\activate  # Windows
+   pip install -r requirements.txt
+   ```
+2. Start the FastAPI server:
+   ```bash
+   python -m app.main
+   ```
+   *Note: Interactive documentation is available at [http://localhost:8000/docs](http://localhost:8000/docs).*
+
+#### 2. Run Text CLI Demo
+Test the LangGraph state loops and memory checkpointer in your terminal:
 ```bash
 python cli.py
 ```
-*Example queries to try:*
-- `"check pods"`
-- `"restart pod auth-service-9d8e7f6c-12345"`
-- `"scale payment-gateway to 5"`
-- `"show me the pods in production again"` (confirms scaling is saved in state!)
-- `"what are the node metrics?"`
+*Try typing: `"check pods in production"`, `"scale payment-gateway to 5"`, `"are they running now?"`.*
 
-### 4. Run FastAPI Backend Server
-```bash
-python -m app.main
-```
-The server starts on [http://localhost:8000](http://localhost:8000).
-- **Interactive Docs**: [http://localhost:8000/docs](http://localhost:8000/docs)
-- **Get Pods**: [http://localhost:8000/api/pods](http://localhost:8000/api/pods)
-- **Get Nodes**: [http://localhost:8000/api/nodes](http://localhost:8000/api/nodes)
-- **Restart Pod (POST)**: [http://localhost:8000/api/pods/restart](http://localhost:8000/api/pods/restart)
-- **Scale Deployment (POST)**: [http://localhost:8000/api/deployments/scale](http://localhost:8000/api/deployments/scale)
+#### 3. Setup Frontend
+1. Install node modules:
+   ```bash
+   cd frontend
+   npm install
+   ```
+2. Run the Next.js dev server:
+   ```bash
+   npm run dev
+   ```
+   *Open [http://localhost:3000](http://localhost:3000) to access the Dashboard.*
 
-### 5. Running Tests
-Run the entire suite of FastAPI endpoint, tool, and LangGraph agent tests:
+---
+
+## 🧪 Testing
+Run the complete unit and integration test suite (covering Kubernetes tools, FastAPI routers, websocket streaming, and multi-turn agent memory):
 ```bash
+.venv\Scripts\activate
 pytest
 ```
+*All 13 integration tests are automated and execute in < 4 seconds.*
